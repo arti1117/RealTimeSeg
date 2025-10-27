@@ -15,5 +15,5 @@ echo "Press Ctrl+C to stop the server"
 echo "================================"
 echo ""
 
-cd "$(dirname "$0")/frontend"
+cd "$(dirname "$0")/../frontend"
 python3 -m http.server 8080

@@ -15,5 +15,5 @@ echo Press Ctrl+C to stop the server
 echo ================================
 echo.
 
-cd frontend
+cd /d "%~dp0..\frontend"
 python -m http.server 8080

@@ -185,7 +185,8 @@ async def websocket_endpoint(websocket: WebSocket):
     # Warm up the model
     inference_engine.warm_up()
 
-    # Get class labels based on model
+    # Get model config and class labels
+    config = MODEL_PROFILES[state["model_mode"]]
     class_labels = get_class_labels_for_model(state["model_mode"])
 
     # Initialize visualizer
