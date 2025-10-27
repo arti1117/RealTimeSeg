@@ -5,9 +5,9 @@ from typing import Tuple, Dict
 import numpy as np
 import torch
 
-from .model_loader import ModelLoader
-from ..utils.frame_processor import FrameProcessor
-from ..utils.config import MODEL_PROFILES, DEVICE, USE_FP16
+from models.model_loader import ModelLoader
+from utils.frame_processor import FrameProcessor
+from utils.config import MODEL_PROFILES, DEVICE, USE_FP16
 
 
 class InferenceEngine:

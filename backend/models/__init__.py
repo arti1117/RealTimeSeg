@@ -1,6 +1,6 @@
 """Models package for semantic segmentation inference."""
 
-from .model_loader import ModelLoader
-from .inference_engine import InferenceEngine
+from models.model_loader import ModelLoader
+from models.inference_engine import InferenceEngine
 
 __all__ = ["ModelLoader", "InferenceEngine"]

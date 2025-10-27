@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image
 import torch
 
-from .config import FRAME_CONFIG
+from utils.config import FRAME_CONFIG
 
 
 class FrameProcessor:
