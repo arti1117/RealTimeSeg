@@ -13,7 +13,10 @@
       "WebFetch(domain:prepotent-unexperientially-homer.ngrok-free.dev)",
       "Bash(git rev-list:*)",
       "Bash(mv:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(pkill:*)",
+      "Bash(bash -c 'cd \"\"$(dirname \"\"./scripts/start_frontend.sh\"\")/../frontend\"\" && pwd && ls index.html')",
+      "Bash(bash:*)"
     ],
     "deny": [],
     "ask": []
