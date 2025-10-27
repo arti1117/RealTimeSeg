@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Semantic Segmentation</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>Real-Time Semantic Segmentation</h1>
+            <p class="subtitle">GPU-Accelerated Webcam Segmentation Demo</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Video Container -->
+            <div class="video-container">
+                <canvas id="canvas" width="1280" height="720"></canvas>
+                <div id="loading" class="loading">
+                    <div class="spinner"></div>
+                    <p>Initializing...</p>
+                </div>
+            </div>
+
+            <!-- Controls Panel -->
+            <div class="controls-panel">
+                <!-- Connection Status -->
+                <div class="control-group">
+                    <h3>Connection</h3>
+                    <div class="status-indicator">
+                        <span id="status-dot" class="status-dot disconnected"></span>
+                        <span id="status-text">Disconnected</span>
+                    </div>
+                    <button id="btn-connect" class="btn btn-primary">Connect</button>
+                    <button id="btn-disconnect" class="btn btn-secondary" disabled>Disconnect</button>
+                </div>
+
+                <!-- Model Selection -->
+                <div class="control-group">
+                    <h3>Performance Profile</h3>
+                    <select id="model-mode" class="select-input">
+                        <option value="fast">Fast Mode (30-40 FPS)</option>
+                        <option value="balanced" selected>Balanced Mode (20-25 FPS)</option>
+                        <option value="accurate">Accurate Mode (10-12 FPS)</option>
+                    </select>
+                    <p class="help-text">Switch between speed and accuracy</p>
+                </div>
+
+                <!-- Visualization Mode -->
+                <div class="control-group">
+                    <h3>Visualization Style</h3>
+                    <div class="button-group">
+                        <button class="btn-viz active" data-mode="filled">Filled Overlay</button>
+                        <button class="btn-viz" data-mode="contour">Contours</button>
+                        <button class="btn-viz" data-mode="side-by-side">Side-by-Side</button>
+                        <button class="btn-viz" data-mode="blend">Blend</button>
+                    </div>
+                </div>
+
+                <!-- Opacity Control -->
+                <div class="control-group">
+                    <h3>Overlay Opacity</h3>
+                    <input type="range" id="opacity-slider" min="0" max="100" value="60" class="slider">
+                    <span id="opacity-value">60%</span>
+                </div>
+
+                <!-- Performance Stats -->
+                <div class="control-group">
+                    <h3>Performance</h3>
+                    <div class="stats">
+                        <div class="stat-item">
+                            <span class="stat-label">FPS:</span>
+                            <span id="stat-fps" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Inference:</span>
+                            <span id="stat-inference" class="stat-value">0 ms</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Classes:</span>
+                            <span id="stat-classes" class="stat-value">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Class Legend (toggleable) -->
+                <div class="control-group">
+                    <h3>Detected Classes</h3>
+                    <div id="class-legend" class="class-legend">
+                        <p class="help-text">No classes detected yet</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Portfolio Demo | PyTorch + FastAPI + WebSocket</p>
+        </footer>
+    </div>
+
+    <!-- JavaScript Modules -->
+    <script src="js/webcam.js"></script>
+    <script src="js/websocket_client.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/controls.js"></script>
+    <script>
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Initializing Real-Time Segmentation App');
+
+            // Initialize components
+            const webcam = new WebcamCapture('canvas');
+            const wsClient = new WebSocketClient();
+            const renderer = new CanvasRenderer('canvas');
+            const controls = new ControlsManager(webcam, wsClient, renderer);
+
+            // Make instances globally accessible for debugging
+            window.app = {
+                webcam,
+                wsClient,
+                renderer,
+                controls
+            };
+
+            console.log('Application initialized');
+        });
+    </script>
+</body>
+</html>
