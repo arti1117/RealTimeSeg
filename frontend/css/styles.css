@@ -213,6 +213,29 @@ body {
     border-color: #667eea;
 }
 
+/* URL Input */
+.url-input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 0.9em;
+    background: white;
+    font-family: 'Courier New', monospace;
+    transition: border-color 0.3s ease;
+    margin-bottom: 8px;
+}
+
+.url-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.url-input::placeholder {
+    color: #adb5bd;
+    font-style: italic;
+}
+
 /* Button Group (Visualization) */
 .button-group {
     display: grid;

@@ -34,6 +34,12 @@
                         <span id="status-dot" class="status-dot disconnected"></span>
                         <span id="status-text">Disconnected</span>
                     </div>
+
+                    <!-- Backend URL Input -->
+                    <label for="backend-url" style="font-size: 0.9em; color: #495057; margin-top: 10px; display: block;">Backend Server URL:</label>
+                    <input type="text" id="backend-url" class="url-input" placeholder="e.g., https://abc123.ngrok.io" />
+                    <p class="help-text">Enter ngrok URL from Colab (leave empty for local)</p>
+
                     <button id="btn-connect" class="btn btn-primary">Connect</button>
                     <button id="btn-disconnect" class="btn btn-secondary" disabled>Disconnect</button>
                 </div>

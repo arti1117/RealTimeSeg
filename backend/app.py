@@ -8,8 +8,6 @@ from collections import deque
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
 import uvicorn
 
 from models import ModelLoader, InferenceEngine
@@ -35,8 +33,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files (frontend)
-app.mount("/static", StaticFiles(directory="../frontend"), name="static")
+# Note: Frontend is served separately (locally)
+# No need to mount static files in split architecture
 
 # Global instances
 model_loader: Optional[ModelLoader] = None
@@ -129,10 +127,15 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    """Serve the main frontend page."""
-    with open("../frontend/index.html", "r") as f:
-        html_content = f.read()
-    return HTMLResponse(content=html_content)
+    """API information endpoint."""
+    return {
+        "name": "Real-Time Segmentation API",
+        "version": "1.0.0",
+        "status": "running",
+        "websocket_endpoint": "/ws",
+        "available_models": model_loader.get_available_modes() if model_loader else [],
+        "message": "Frontend should be served separately. Connect to /ws endpoint via WebSocket."
+    }
 
 
 @app.get("/health")
