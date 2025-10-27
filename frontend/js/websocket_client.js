@@ -27,11 +27,29 @@ class WebSocketClient {
      */
     getWebSocketUrl(customUrl = null) {
         if (customUrl) {
-            // Use custom URL (e.g., ngrok URL from Colab)
-            // Ensure it has the /ws endpoint
-            const url = customUrl.endsWith('/ws') ? customUrl : `${customUrl}/ws`;
-            // Convert http to ws, https to wss
-            return url.replace(/^http/, 'ws');
+            // Clean up the URL
+            let cleanUrl = customUrl.trim();
+
+            // Remove trailing slash if present
+            cleanUrl = cleanUrl.replace(/\/$/, '');
+
+            // Add /ws endpoint if not present
+            if (!cleanUrl.endsWith('/ws')) {
+                cleanUrl = cleanUrl + '/ws';
+            }
+
+            // Convert http/https to ws/wss
+            if (cleanUrl.startsWith('https://')) {
+                cleanUrl = cleanUrl.replace('https://', 'wss://');
+            } else if (cleanUrl.startsWith('http://')) {
+                cleanUrl = cleanUrl.replace('http://', 'ws://');
+            } else if (!cleanUrl.startsWith('ws://') && !cleanUrl.startsWith('wss://')) {
+                // No protocol specified, assume https (ngrok uses https)
+                cleanUrl = 'wss://' + cleanUrl;
+            }
+
+            console.log(`🔗 Backend URL converted: ${customUrl} → ${cleanUrl}`);
+            return cleanUrl;
         }
 
         // Default: use current page location
@@ -151,10 +169,15 @@ class WebSocketClient {
      * Handle WebSocket error
      */
     handleError(error) {
-        console.error('WebSocket error:', error);
+        console.error('❌ WebSocket error:', error);
+        console.error('❌ Failed to connect to:', this.serverUrl);
+        console.error('💡 Troubleshooting:');
+        console.error('   1. Check backend is running (Colab Cell 6)');
+        console.error('   2. Verify ngrok URL is correct');
+        console.error('   3. Backend should show "Uvicorn running"');
 
         if (this.onErrorCallback) {
-            this.onErrorCallback('WEBSOCKET_ERROR', 'Connection error occurred');
+            this.onErrorCallback('WEBSOCKET_ERROR', 'Failed to connect to backend. Check console for details.');
         }
     }
 
