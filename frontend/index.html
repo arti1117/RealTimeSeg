@@ -18,7 +18,10 @@
         <main class="main-content">
             <!-- Video Container -->
             <div class="video-container">
-                <canvas id="canvas" width="1280" height="720"></canvas>
+                <!-- Visible canvas for displaying segmentation results -->
+                <canvas id="display-canvas" width="1280" height="720"></canvas>
+                <!-- Hidden canvas for webcam capture (not displayed) -->
+                <canvas id="capture-canvas" width="1280" height="720" style="display: none;"></canvas>
                 <div id="loading" class="loading">
                     <div class="spinner"></div>
                     <p>Initializing...</p>
@@ -118,10 +121,10 @@
         document.addEventListener('DOMContentLoaded', () => {
             console.log('Initializing Real-Time Segmentation App');
 
-            // Initialize components
-            const webcam = new WebcamCapture('canvas');
+            // Initialize components with separate canvases
+            const webcam = new WebcamCapture('capture-canvas');  // Hidden canvas for capture
             const wsClient = new WebSocketClient();
-            const renderer = new CanvasRenderer('canvas');
+            const renderer = new CanvasRenderer('display-canvas');  // Visible canvas for display
             const controls = new ControlsManager(webcam, wsClient, renderer);
 
             // Make instances globally accessible for debugging
@@ -132,7 +135,7 @@
                 controls
             };
 
-            console.log('Application initialized');
+            console.log('Application initialized with separate capture and display canvases');
         });
     </script>
 </body>
