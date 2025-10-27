@@ -6,7 +6,7 @@ import torch
 import torchvision.models.segmentation as models
 from transformers import SegformerForSemanticSegmentation
 
-from ..utils.config import MODEL_PROFILES, DEVICE, USE_FP16
+from utils.config import MODEL_PROFILES, DEVICE, USE_FP16
 
 
 class ModelLoader:

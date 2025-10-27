@@ -1,6 +1,6 @@
 """Utilities package for backend server."""
 
-from .config import (
+from utils.config import (
     MODEL_PROFILES,
     COCO_CLASSES,
     ADE20K_CLASSES,
