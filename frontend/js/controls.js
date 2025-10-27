@@ -11,6 +11,7 @@ class ControlsManager {
         this.elements = {
             btnConnect: document.getElementById('btn-connect'),
             btnDisconnect: document.getElementById('btn-disconnect'),
+            backendUrl: document.getElementById('backend-url'),
             statusDot: document.getElementById('status-dot'),
             statusText: document.getElementById('status-text'),
             loading: document.getElementById('loading'),
@@ -114,8 +115,11 @@ class ControlsManager {
             return;
         }
 
-        // Connect to WebSocket
-        await this.wsClient.connect();
+        // Get backend URL from input field
+        const backendUrl = this.elements.backendUrl.value.trim();
+
+        // Connect to WebSocket with custom URL (if provided)
+        await this.wsClient.connect(backendUrl || null);
 
         // Wait a bit for connection
         await new Promise(resolve => setTimeout(resolve, 1000));

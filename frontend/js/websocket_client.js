@@ -23,9 +23,18 @@ class WebSocketClient {
     }
 
     /**
-     * Get WebSocket URL based on current page location
+     * Get WebSocket URL - can be configured or use default
      */
-    getWebSocketUrl() {
+    getWebSocketUrl(customUrl = null) {
+        if (customUrl) {
+            // Use custom URL (e.g., ngrok URL from Colab)
+            // Ensure it has the /ws endpoint
+            const url = customUrl.endsWith('/ws') ? customUrl : `${customUrl}/ws`;
+            // Convert http to ws, https to wss
+            return url.replace(/^http/, 'ws');
+        }
+
+        // Default: use current page location
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host;
         return `${protocol}//${host}/ws`;
@@ -34,10 +43,15 @@ class WebSocketClient {
     /**
      * Connect to WebSocket server
      */
-    async connect() {
+    async connect(customUrl = null) {
         if (this.isConnected) {
             console.warn('Already connected');
             return;
+        }
+
+        // Update server URL if custom URL provided
+        if (customUrl) {
+            this.serverUrl = this.getWebSocketUrl(customUrl);
         }
 
         try {
