@@ -45,6 +45,15 @@ MODEL_PROFILES: Dict[str, ModelConfig] = {
         optimization="pytorch",
         expected_fps=12,
         memory_mb=4500
+    ),
+    "sota": ModelConfig(
+        name="mask2former-swin-large-ade20k",
+        backbone="swin_large",
+        input_size=(1024, 1024),
+        num_classes=150,
+        optimization="pytorch",
+        expected_fps=7,
+        memory_mb=6500
     )
 }
 
@@ -66,6 +75,20 @@ ADE20K_CLASSES: List[str] = [
     # ... (150 total, abbreviated for config)
 ]
 
+# WebSocket message types (constants for type safety)
+class MessageType:
+    """WebSocket message type constants."""
+    FRAME = "frame"
+    CHANGE_MODE = "change_mode"
+    UPDATE_VIZ = "update_viz"
+    GET_STATS = "get_stats"
+    CONNECTED = "connected"
+    SEGMENTATION = "segmentation"
+    MODE_CHANGED = "mode_changed"
+    VIZ_UPDATED = "viz_updated"
+    STATS = "stats"
+    ERROR = "error"
+
 # Server configuration
 SERVER_CONFIG = {
     "host": "0.0.0.0",
@@ -84,14 +107,32 @@ FRAME_CONFIG = {
     "max_height": 720
 }
 
+# Visualization mode constants
+class VizMode:
+    """Visualization mode constants."""
+    FILLED = "filled"
+    CONTOUR = "contour"
+    SIDE_BY_SIDE = "side-by-side"
+    BLEND = "blend"
+
 # Visualization configuration
 VIZ_CONFIG = {
     "default_opacity": 0.6,
-    "default_mode": "filled",
-    "available_modes": ["filled", "contour", "side-by-side", "blend"],
+    "default_mode": VizMode.FILLED,
+    "available_modes": [VizMode.FILLED, VizMode.CONTOUR, VizMode.SIDE_BY_SIDE, VizMode.BLEND],
     "colormap": "ade20k"
 }
 
-# Device configuration
-DEVICE = "cuda" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cpu"
-USE_FP16 = True if DEVICE == "cuda" else False
+# Device configuration - robust CUDA detection
+def _detect_device() -> str:
+    """Detect best available compute device."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return "cuda"
+    except ImportError:
+        pass
+    return "cpu"
+
+DEVICE = _detect_device()
+USE_FP16 = DEVICE == "cuda"

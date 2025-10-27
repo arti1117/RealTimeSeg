@@ -12,10 +12,11 @@ import uvicorn
 
 from models import ModelLoader, InferenceEngine
 from utils import (
-    COCO_CLASSES,
-    ADE20K_CLASSES,
     SERVER_CONFIG,
-    MODEL_PROFILES
+    MODEL_PROFILES,
+    MessageType,
+    get_class_labels_for_model,
+    create_error_response
 )
 from utils.frame_processor import FrameProcessor
 from utils.segmentation_viz import SegmentationVisualizer
@@ -185,8 +186,7 @@ async def websocket_endpoint(websocket: WebSocket):
     inference_engine.warm_up()
 
     # Get class labels based on model
-    config = MODEL_PROFILES[state["model_mode"]]
-    class_labels = COCO_CLASSES if config.num_classes == 21 else ADE20K_CLASSES[:30]
+    class_labels = get_class_labels_for_model(state["model_mode"])
 
     # Initialize visualizer
     visualizer = SegmentationVisualizer(num_classes=config.num_classes)
@@ -199,7 +199,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     # Send connection acknowledgement
     await websocket.send_json({
-        "type": "connected",
+        "type": MessageType.CONNECTED,
         "status": "ready",
         "available_models": model_loader.get_available_modes(),
         "class_labels": class_labels,
@@ -214,17 +214,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
             msg_type = data.get("type")
 
-            if msg_type == "frame":
-                # Queue the frame for processing
+            if msg_type == MessageType.FRAME:
                 await handle_frame(websocket, data)
-
-            elif msg_type == "change_mode":
+            elif msg_type == MessageType.CHANGE_MODE:
                 await handle_mode_change(websocket, data)
-
-            elif msg_type == "update_viz":
+            elif msg_type == MessageType.UPDATE_VIZ:
                 await handle_viz_update(websocket, data)
-
-            elif msg_type == "get_stats":
+            elif msg_type == MessageType.GET_STATS:
                 await handle_stats_request(websocket)
 
     except WebSocketDisconnect:
@@ -269,14 +265,13 @@ async def handle_frame(websocket: WebSocket, data: Dict):
         # Encode result
         encoded_result = frame_processor.encode_frame(viz_frame, format="jpeg")
 
-        # Get class labels
-        config = MODEL_PROFILES[state["model_mode"]]
-        class_labels = COCO_CLASSES if config.num_classes == 21 else ADE20K_CLASSES[:30]
+        # Get class labels and map detected classes to names
+        class_labels = get_class_labels_for_model(state["model_mode"])
         detected_class_names = [class_labels[i] for i in detected_classes if i < len(class_labels)]
 
         # Send result
         await websocket.send_json({
-            "type": "segmentation",
+            "type": MessageType.SEGMENTATION,
             "timestamp": timestamp,
             "data": encoded_result,
             "metadata": {
@@ -286,12 +281,9 @@ async def handle_frame(websocket: WebSocket, data: Dict):
         })
 
     except Exception as e:
-        await websocket.send_json({
-            "type": "error",
-            "code": "INFERENCE_FAILED",
-            "message": str(e),
-            "recoverable": True
-        })
+        await websocket.send_json(
+            create_error_response("INFERENCE_FAILED", str(e))
+        )
 
 
 async def handle_mode_change(websocket: WebSocket, data: Dict):
@@ -300,12 +292,9 @@ async def handle_mode_change(websocket: WebSocket, data: Dict):
         new_mode = data.get("model_mode")
 
         if new_mode not in MODEL_PROFILES:
-            await websocket.send_json({
-                "type": "error",
-                "code": "INVALID_MODE",
-                "message": f"Invalid model mode: {new_mode}",
-                "recoverable": True
-            })
+            await websocket.send_json(
+                create_error_response("INVALID_MODE", f"Invalid model mode: {new_mode}")
+            )
             return
 
         state = manager.get_state(websocket)
@@ -326,21 +315,18 @@ async def handle_mode_change(websocket: WebSocket, data: Dict):
         })
 
         # Get new class labels
-        class_labels = COCO_CLASSES if config.num_classes == 21 else ADE20K_CLASSES[:30]
+        class_labels = get_class_labels_for_model(new_mode)
 
         await websocket.send_json({
-            "type": "mode_changed",
+            "type": MessageType.MODE_CHANGED,
             "model_mode": new_mode,
             "class_labels": class_labels
         })
 
     except Exception as e:
-        await websocket.send_json({
-            "type": "error",
-            "code": "MODE_CHANGE_FAILED",
-            "message": str(e),
-            "recoverable": True
-        })
+        await websocket.send_json(
+            create_error_response("MODE_CHANGE_FAILED", str(e))
+        )
 
 
 async def handle_viz_update(websocket: WebSocket, data: Dict):
@@ -359,17 +345,14 @@ async def handle_viz_update(websocket: WebSocket, data: Dict):
         manager.update_state(websocket, updates)
 
         await websocket.send_json({
-            "type": "viz_updated",
+            "type": MessageType.VIZ_UPDATED,
             "settings": updates
         })
 
     except Exception as e:
-        await websocket.send_json({
-            "type": "error",
-            "code": "VIZ_UPDATE_FAILED",
-            "message": str(e),
-            "recoverable": True
-        })
+        await websocket.send_json(
+            create_error_response("VIZ_UPDATE_FAILED", str(e))
+        )
 
 
 async def handle_stats_request(websocket: WebSocket):
@@ -381,17 +364,14 @@ async def handle_stats_request(websocket: WebSocket):
         stats = inference_engine.get_performance_stats()
 
         await websocket.send_json({
-            "type": "stats",
+            "type": MessageType.STATS,
             **stats
         })
 
     except Exception as e:
-        await websocket.send_json({
-            "type": "error",
-            "code": "STATS_FAILED",
-            "message": str(e),
-            "recoverable": True
-        })
+        await websocket.send_json(
+            create_error_response("STATS_FAILED", str(e))
+        )
 
 
 if __name__ == "__main__":

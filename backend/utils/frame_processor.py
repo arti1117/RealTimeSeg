@@ -29,7 +29,13 @@ class FrameProcessor:
 
         Returns:
             Decoded image as numpy array (H, W, C) in RGB format
+
+        Raises:
+            ValueError: If frame is empty, invalid format, or decoding fails
         """
+        if not base64_data:
+            raise ValueError("Empty frame data received")
+
         try:
             # Remove data URL prefix if present
             if "," in base64_data:
@@ -38,18 +44,26 @@ class FrameProcessor:
             # Decode base64 to bytes
             img_bytes = base64.b64decode(base64_data)
 
+            if len(img_bytes) == 0:
+                raise ValueError("Decoded frame has zero bytes")
+
             # Convert to numpy array
             nparr = np.frombuffer(img_bytes, np.uint8)
 
             # Decode JPEG
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
+            if img is None:
+                raise ValueError("cv2.imdecode returned None - invalid image format")
+
             # Convert BGR to RGB
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
             return img
+        except base64.binascii.Error as e:
+            raise ValueError(f"Invalid base64 encoding: {str(e)}")
         except Exception as e:
-            raise ValueError(f"Failed to decode frame: {str(e)}")
+            raise ValueError(f"Failed to decode frame: {type(e).__name__}: {str(e)}")
 
     def encode_frame(self, frame: np.ndarray, format: str = "jpeg") -> str:
         """
@@ -61,7 +75,16 @@ class FrameProcessor:
 
         Returns:
             Base64-encoded image string
+
+        Raises:
+            ValueError: If frame is invalid, unsupported format, or encoding fails
         """
+        if frame is None or frame.size == 0:
+            raise ValueError("Empty or None frame provided for encoding")
+
+        if len(frame.shape) != 3 or frame.shape[2] != 3:
+            raise ValueError(f"Invalid frame shape: {frame.shape}. Expected (H, W, 3)")
+
         try:
             if format == "jpeg":
                 # Convert RGB to BGR for OpenCV
@@ -69,7 +92,10 @@ class FrameProcessor:
 
                 # Encode as JPEG
                 encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), self.jpeg_quality]
-                _, buffer = cv2.imencode('.jpg', frame_bgr, encode_param)
+                success, buffer = cv2.imencode('.jpg', frame_bgr, encode_param)
+
+                if not success:
+                    raise ValueError("JPEG encoding failed")
 
             elif format == "png":
                 # Convert RGB to BGR for OpenCV
@@ -77,17 +103,22 @@ class FrameProcessor:
 
                 # Encode as PNG
                 encode_param = [int(cv2.IMWRITE_PNG_COMPRESSION), FRAME_CONFIG["png_compression"]]
-                _, buffer = cv2.imencode('.png', frame_bgr, encode_param)
+                success, buffer = cv2.imencode('.png', frame_bgr, encode_param)
+
+                if not success:
+                    raise ValueError("PNG encoding failed")
             else:
-                raise ValueError(f"Unsupported format: {format}")
+                raise ValueError(f"Unsupported format: {format}. Use 'jpeg' or 'png'")
 
             # Convert to base64
             base64_data = base64.b64encode(buffer).decode('utf-8')
 
             return base64_data
 
+        except cv2.error as e:
+            raise ValueError(f"OpenCV encoding error: {str(e)}")
         except Exception as e:
-            raise ValueError(f"Failed to encode frame: {str(e)}")
+            raise ValueError(f"Failed to encode frame: {type(e).__name__}: {str(e)}")
 
     def preprocess_for_model(
         self,

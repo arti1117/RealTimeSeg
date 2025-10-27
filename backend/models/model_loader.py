@@ -4,7 +4,7 @@ import os
 from typing import Dict, Optional
 import torch
 import torchvision.models.segmentation as models
-from transformers import SegformerForSemanticSegmentation
+from transformers import SegformerForSemanticSegmentation, Mask2FormerForUniversalSegmentation
 
 from utils.config import MODEL_PROFILES, DEVICE, USE_FP16
 
@@ -46,6 +46,8 @@ class ModelLoader:
             model = self._load_deeplabv3(config.backbone)
         elif mode == "accurate":
             model = self._load_segformer()
+        elif mode == "sota":
+            model = self._load_mask2former()
         else:
             raise ValueError(f"Unsupported model mode: {mode}")
 
@@ -94,6 +96,20 @@ class ModelLoader:
         """
         model = SegformerForSemanticSegmentation.from_pretrained(
             "nvidia/segformer-b3-finetuned-ade-512-512",
+            cache_dir=self.cache_dir
+        )
+
+        return model
+
+    def _load_mask2former(self) -> torch.nn.Module:
+        """
+        Load Mask2Former SOTA model from Hugging Face.
+
+        Returns:
+            Mask2Former model
+        """
+        model = Mask2FormerForUniversalSegmentation.from_pretrained(
+            "facebook/mask2former-swin-large-ade-semantic",
             cache_dir=self.cache_dir
         )
 
