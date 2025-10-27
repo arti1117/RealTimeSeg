@@ -105,24 +105,42 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize models and processors on startup."""
+def initialize_server():
+    """Initialize models and processors."""
     global model_loader, frame_processor
+
+    if model_loader is not None:
+        print("Server already initialized")
+        return
 
     print("Initializing server...")
 
-    # Initialize model loader
-    model_loader = ModelLoader()
+    try:
+        # Initialize model loader
+        model_loader = ModelLoader()
+        print("✓ Model loader created")
 
-    # Preload default model
-    print(f"Loading default model: {SERVER_CONFIG['default_model']}")
-    model_loader.load_model(SERVER_CONFIG["default_model"])
+        # Preload default model
+        print(f"Loading default model: {SERVER_CONFIG['default_model']}")
+        model_loader.load_model(SERVER_CONFIG["default_model"])
+        print("✓ Default model loaded")
 
-    # Initialize frame processor
-    frame_processor = FrameProcessor()
+        # Initialize frame processor
+        frame_processor = FrameProcessor()
+        print("✓ Frame processor created")
 
-    print("Server initialized successfully")
+        print("✅ Server initialized successfully")
+    except Exception as e:
+        print(f"❌ Server initialization failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize models and processors on startup."""
+    initialize_server()
 
 
 @app.get("/")
@@ -151,6 +169,11 @@ async def health_check():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time segmentation."""
+    # Ensure server is initialized
+    if model_loader is None or frame_processor is None:
+        print("⚠️ Server not initialized, initializing now...")
+        initialize_server()
+
     await manager.connect(websocket)
 
     # Initialize inference engine for this connection
