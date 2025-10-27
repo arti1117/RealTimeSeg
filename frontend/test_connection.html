@@ -98,24 +98,51 @@
 
                 log(`✅ HTTP Status: ${response.status} ${response.statusText}`, 'success');
 
+                // Get response as text first to see what we're actually receiving
+                const responseText = await response.text();
+
                 if (response.ok) {
-                    const data = await response.json();
-                    log('✅ Backend is responding!', 'success');
-                    log(`📦 Response: ${JSON.stringify(data, null, 2)}`, 'info');
+                    // Try to parse as JSON
+                    try {
+                        const data = JSON.parse(responseText);
+                        log('✅ Backend is responding with valid JSON!', 'success');
+                        log(`📦 Response: ${JSON.stringify(data, null, 2)}`, 'info');
 
-                    if (data.websocket_endpoint) {
-                        log(`✅ WebSocket endpoint: ${data.websocket_endpoint}`, 'success');
+                        if (data.websocket_endpoint) {
+                            log(`✅ WebSocket endpoint: ${data.websocket_endpoint}`, 'success');
+                        }
+
+                        if (data.available_models) {
+                            log(`✅ Available models: ${data.available_models.join(', ')}`, 'success');
+                        }
+
+                        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                        log('✅ HTTP TEST PASSED - Backend is reachable!', 'success');
+                        log('💡 Now try "2. Test WebSocket"', 'warning');
+                    } catch (parseError) {
+                        // JSON parsing failed - show what we actually received
+                        log('❌ Backend returned non-JSON response', 'error');
+                        log('📄 Raw response (first 500 chars):', 'warning');
+                        log(responseText.substring(0, 500), 'info');
+                        log('', 'error');
+                        log('💡 Diagnosis:', 'warning');
+                        if (responseText.includes('ngrok')) {
+                            log('   ⚠️ This looks like an ngrok page', 'error');
+                            log('   → Check if your ngrok URL is correct', 'info');
+                            log('   → Verify ngrok is still running in Colab', 'info');
+                        } else if (responseText.includes('<html>') || responseText.includes('<!DOCTYPE')) {
+                            log('   ⚠️ Backend returned HTML instead of JSON', 'error');
+                            log('   → Backend might not be running correctly', 'info');
+                            log('   → Check Colab Cell 6 output for errors', 'info');
+                        } else {
+                            log('   ⚠️ Unknown response format', 'error');
+                            log('   → Check the raw response above', 'info');
+                        }
                     }
-
-                    if (data.available_models) {
-                        log(`✅ Available models: ${data.available_models.join(', ')}`, 'success');
-                    }
-
-                    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-                    log('✅ HTTP TEST PASSED - Backend is reachable!', 'success');
-                    log('💡 Now try "2. Test WebSocket"', 'warning');
                 } else {
                     log(`❌ HTTP Error: ${response.status}`, 'error');
+                    log('📄 Error response:', 'warning');
+                    log(responseText.substring(0, 500), 'info');
                 }
             } catch (error) {
                 log(`❌ Connection Failed: ${error.message}`, 'error');
@@ -172,7 +199,12 @@
                         ws.close();
                     }
                 } catch (e) {
-                    log(`📦 Raw: ${event.data}`, 'info');
+                    log('⚠️ Received non-JSON message:', 'warning');
+                    log(`📦 Raw message (first 200 chars): ${event.data.substring(0, 200)}`, 'info');
+                    if (event.data.includes('<html>') || event.data.includes('<!DOCTYPE')) {
+                        log('❌ Backend sent HTML instead of JSON', 'error');
+                        log('   → Check if backend is properly initialized', 'info');
+                    }
                 }
             };
 
