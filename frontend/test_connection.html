@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backend Connection Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        h1 { color: #4ec9b0; }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            background: #2d2d30;
+            border: 2px solid #3e3e42;
+            color: #d4d4d4;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover { background: #1177bb; }
+        .log {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            padding: 15px;
+            margin-top: 20px;
+            height: 400px;
+            overflow-y: auto;
+            font-size: 14px;
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .info { color: #9cdcfe; }
+        .warning { color: #dcdcaa; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Backend Connection Test</h1>
+    <p>Test your backend connection before using the main app.</p>
+
+    <label for="backend-url">Backend URL (from Colab Cell 5):</label>
+    <input type="text" id="backend-url" placeholder="https://abc123.ngrok.io" />
+
+    <button onclick="testHTTP()">1. Test HTTP</button>
+    <button onclick="testWebSocket()">2. Test WebSocket</button>
+    <button onclick="clearLog()">Clear Log</button>
+
+    <div class="log" id="log"></div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function getBackendUrl() {
+            const url = document.getElementById('backend-url').value.trim();
+            if (!url) {
+                log('❌ Please enter a backend URL', 'error');
+                return null;
+            }
+            return url;
+        }
+
+        async function testHTTP() {
+            const url = getBackendUrl();
+            if (!url) return;
+
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            log('🧪 TEST 1: HTTP Connection', 'warning');
+            log(`📍 URL: ${url}`, 'info');
+
+            try {
+                log('📡 Fetching backend info...', 'info');
+                const response = await fetch(url);
+
+                log(`✅ HTTP Status: ${response.status} ${response.statusText}`, 'success');
+
+                if (response.ok) {
+                    const data = await response.json();
+                    log('✅ Backend is responding!', 'success');
+                    log(`📦 Response: ${JSON.stringify(data, null, 2)}`, 'info');
+
+                    if (data.websocket_endpoint) {
+                        log(`✅ WebSocket endpoint: ${data.websocket_endpoint}`, 'success');
+                    }
+
+                    if (data.available_models) {
+                        log(`✅ Available models: ${data.available_models.join(', ')}`, 'success');
+                    }
+
+                    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    log('✅ HTTP TEST PASSED - Backend is reachable!', 'success');
+                    log('💡 Now try "2. Test WebSocket"', 'warning');
+                } else {
+                    log(`❌ HTTP Error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Connection Failed: ${error.message}`, 'error');
+                log('', 'error');
+                log('💡 Troubleshooting:', 'warning');
+                log('   1. Is Colab Cell 6 running?', 'info');
+                log('   2. Check the ngrok URL from Cell 5', 'info');
+                log('   3. Try accessing the URL in a new tab', 'info');
+                log('   4. Check Colab output for errors', 'info');
+            }
+        }
+
+        function testWebSocket() {
+            const url = getBackendUrl();
+            if (!url) return;
+
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            log('🧪 TEST 2: WebSocket Connection', 'warning');
+
+            // Convert to WebSocket URL
+            let wsUrl = url.trim().replace(/\/$/, '');
+            if (!wsUrl.endsWith('/ws')) {
+                wsUrl += '/ws';
+            }
+            if (wsUrl.startsWith('https://')) {
+                wsUrl = wsUrl.replace('https://', 'wss://');
+            } else if (wsUrl.startsWith('http://')) {
+                wsUrl = wsUrl.replace('http://', 'ws://');
+            } else if (!wsUrl.startsWith('ws')) {
+                wsUrl = 'wss://' + wsUrl;
+            }
+
+            log(`📍 WebSocket URL: ${wsUrl}`, 'info');
+            log('📡 Connecting...', 'info');
+
+            const ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                log('✅ WebSocket Connected!', 'success');
+                log('✅ Waiting for server response...', 'success');
+            };
+
+            ws.onmessage = (event) => {
+                log('✅ Received message from server:', 'success');
+                try {
+                    const data = JSON.parse(event.data);
+                    log(`📦 ${JSON.stringify(data, null, 2)}`, 'info');
+
+                    if (data.type === 'connected') {
+                        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                        log('🎉 WEBSOCKET TEST PASSED!', 'success');
+                        log('✅ Backend is fully functional', 'success');
+                        log('✅ You can now use the main app', 'success');
+                        ws.close();
+                    }
+                } catch (e) {
+                    log(`📦 Raw: ${event.data}`, 'info');
+                }
+            };
+
+            ws.onerror = (error) => {
+                log(`❌ WebSocket Error: ${error}`, 'error');
+                log('', 'error');
+                log('💡 Troubleshooting:', 'warning');
+                log('   1. Make sure HTTP test passed first', 'info');
+                log('   2. Check CORS settings in backend', 'info');
+                log('   3. Verify ngrok is still active', 'info');
+            };
+
+            ws.onclose = (event) => {
+                if (event.wasClean) {
+                    log(`✅ Connection closed cleanly (code=${event.code})`, 'success');
+                } else {
+                    log(`❌ Connection died (code=${event.code})`, 'error');
+                    log(`   Reason: ${event.reason || 'No reason provided'}`, 'error');
+                }
+            };
+
+            // Timeout after 10 seconds
+            setTimeout(() => {
+                if (ws.readyState !== WebSocket.OPEN) {
+                    log('⏱️ Connection timeout (10s)', 'error');
+                    ws.close();
+                }
+            }, 10000);
+        }
+    </script>
+</body>
+</html>
