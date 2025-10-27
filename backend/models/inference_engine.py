@@ -35,8 +35,10 @@ class InferenceEngine:
         if mode not in MODEL_PROFILES:
             raise ValueError(f"Unknown model mode: {mode}")
 
-        if mode != self.current_mode:
-            print(f"Switching model from {self.current_mode} to {mode}")
+        # Load model if not loaded or if mode changed
+        if self.current_model is None or mode != self.current_mode:
+            if mode != self.current_mode:
+                print(f"Switching model from {self.current_mode} to {mode}")
             self.current_mode = mode
             self.current_model = self.model_loader.load_model(mode)
 
