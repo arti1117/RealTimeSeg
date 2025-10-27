@@ -6,15 +6,23 @@ from typing import List, Optional, Tuple
 
 
 class SegmentationVisualizer:
-    """Creates visualizations of segmentation masks."""
+    """Creates visualizations of segmentation masks with optimized rendering."""
+
+    # Class-level colormap cache to avoid regeneration
+    _colormap_cache = {}
 
     def __init__(self, num_classes: int = 21):
         self.num_classes = num_classes
-        self.colormap = self._generate_colormap(num_classes)
+
+        # Use cached colormap if available
+        if num_classes not in self._colormap_cache:
+            self._colormap_cache[num_classes] = self._generate_colormap(num_classes)
+
+        self.colormap = self._colormap_cache[num_classes]
 
     def _generate_colormap(self, num_classes: int) -> np.ndarray:
         """
-        Generate a colormap for segmentation classes.
+        Generate a colormap for segmentation classes using PASCAL VOC scheme.
 
         Args:
             num_classes: Number of classes
@@ -25,15 +33,16 @@ class SegmentationVisualizer:
         # Use a variation of the PASCAL VOC colormap
         colormap = np.zeros((num_classes, 3), dtype=np.uint8)
 
+        # Constants for bit manipulation
+        NUM_BITS = 8
+
         for i in range(num_classes):
-            r = 0
-            g = 0
-            b = 0
+            r = g = b = 0
             c = i
-            for j in range(8):
-                r |= ((c >> 0) & 1) << (7 - j)
-                g |= ((c >> 1) & 1) << (7 - j)
-                b |= ((c >> 2) & 1) << (7 - j)
+            for j in range(NUM_BITS):
+                r |= ((c >> 0) & 1) << (NUM_BITS - 1 - j)
+                g |= ((c >> 1) & 1) << (NUM_BITS - 1 - j)
+                b |= ((c >> 2) & 1) << (NUM_BITS - 1 - j)
                 c >>= 3
 
             colormap[i] = [r, g, b]
@@ -45,7 +54,7 @@ class SegmentationVisualizer:
 
     def apply_colormap(self, mask: np.ndarray) -> np.ndarray:
         """
-        Apply colormap to segmentation mask.
+        Apply colormap to segmentation mask using vectorized lookup.
 
         Args:
             mask: Segmentation mask (H, W) with class indices
@@ -53,13 +62,41 @@ class SegmentationVisualizer:
         Returns:
             Colorized mask (H, W, 3) in RGB format
         """
-        h, w = mask.shape
-        colored_mask = np.zeros((h, w, 3), dtype=np.uint8)
-
-        for class_id in range(self.num_classes):
-            colored_mask[mask == class_id] = self.colormap[class_id]
+        # Vectorized colormap lookup (much faster than loop)
+        # Clip mask values to valid range to prevent index errors
+        mask_clipped = np.clip(mask, 0, self.num_classes - 1)
+        colored_mask = self.colormap[mask_clipped]
 
         return colored_mask
+
+    def _apply_class_filter(
+        self,
+        colored_mask: np.ndarray,
+        mask: np.ndarray,
+        class_filter: Optional[List[int]]
+    ) -> np.ndarray:
+        """
+        Apply class filtering to colored mask (DRY helper method).
+
+        Args:
+            colored_mask: Colored segmentation mask (H, W, 3)
+            mask: Original class mask (H, W)
+            class_filter: List of class IDs to show (None = show all)
+
+        Returns:
+            Filtered colored mask
+        """
+        if class_filter is None:
+            return colored_mask
+
+        # Create boolean mask for filtered classes
+        filter_mask = np.isin(mask, class_filter)
+
+        # Zero out non-filtered regions
+        result = colored_mask.copy()
+        result[~filter_mask] = 0
+
+        return result
 
     def create_filled_overlay(
         self,
@@ -69,26 +106,22 @@ class SegmentationVisualizer:
         class_filter: Optional[List[int]] = None
     ) -> np.ndarray:
         """
-        Create filled overlay visualization.
+        Create filled overlay visualization with transparent colored mask.
 
         Args:
-            image: Original image (H, W, 3)
-            mask: Segmentation mask (H, W)
-            opacity: Overlay opacity (0-1)
+            image: Original image (H, W, 3) in RGB format
+            mask: Segmentation mask (H, W) with class indices
+            opacity: Overlay opacity in range [0, 1] where 0=transparent, 1=opaque
             class_filter: List of class IDs to show (None = show all)
 
         Returns:
-            Image with overlay (H, W, 3)
+            Image with overlay (H, W, 3) in RGB format
         """
         # Apply colormap
         colored_mask = self.apply_colormap(mask)
 
         # Apply class filter if specified
-        if class_filter is not None:
-            filter_mask = np.zeros_like(mask, dtype=bool)
-            for class_id in class_filter:
-                filter_mask |= (mask == class_id)
-            colored_mask[~filter_mask] = 0
+        colored_mask = self._apply_class_filter(colored_mask, mask, class_filter)
 
         # Blend with original image
         overlay = cv2.addWeighted(
@@ -149,25 +182,21 @@ class SegmentationVisualizer:
         class_filter: Optional[List[int]] = None
     ) -> np.ndarray:
         """
-        Create side-by-side visualization.
+        Create side-by-side visualization showing original and segmentation.
 
         Args:
-            image: Original image (H, W, 3)
-            mask: Segmentation mask (H, W)
+            image: Original image (H, W, 3) in RGB format
+            mask: Segmentation mask (H, W) with class indices
             class_filter: List of class IDs to show (None = show all)
 
         Returns:
-            Side-by-side image (H, W*2, 3)
+            Side-by-side image (H, W*2, 3) with original left, segmentation right
         """
         # Apply colormap
         colored_mask = self.apply_colormap(mask)
 
         # Apply class filter if specified
-        if class_filter is not None:
-            filter_mask = np.zeros_like(mask, dtype=bool)
-            for class_id in class_filter:
-                filter_mask |= (mask == class_id)
-            colored_mask[~filter_mask] = 0
+        colored_mask = self._apply_class_filter(colored_mask, mask, class_filter)
 
         # Concatenate horizontally
         result = np.hstack([image, colored_mask])
@@ -183,23 +212,22 @@ class SegmentationVisualizer:
         """
         Create artistic blend visualization using HSV color space.
 
+        Blends segmentation hue with original image saturation/value for
+        an artistic effect that preserves image detail while showing classes.
+
         Args:
-            image: Original image (H, W, 3)
-            mask: Segmentation mask (H, W)
+            image: Original image (H, W, 3) in RGB format
+            mask: Segmentation mask (H, W) with class indices
             class_filter: List of class IDs to show (None = show all)
 
         Returns:
-            Blended image (H, W, 3)
+            Blended image (H, W, 3) in RGB format with artistic HSV blending
         """
         # Apply colormap
         colored_mask = self.apply_colormap(mask)
 
         # Apply class filter if specified
-        if class_filter is not None:
-            filter_mask = np.zeros_like(mask, dtype=bool)
-            for class_id in class_filter:
-                filter_mask |= (mask == class_id)
-            colored_mask[~filter_mask] = 0
+        colored_mask = self._apply_class_filter(colored_mask, mask, class_filter)
 
         # Convert to HSV
         image_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)

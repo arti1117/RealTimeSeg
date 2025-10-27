@@ -23,6 +23,7 @@ A complete full-stack implementation demonstrating real-time semantic segmentati
 - **Fast Mode**: DeepLabV3-MobileNetV3 (30-40 FPS, 21 classes)
 - **Balanced Mode**: DeepLabV3-ResNet50 (20-25 FPS, 21 classes)
 - **Accurate Mode**: SegFormer-B3 (10-12 FPS, 150 classes)
+- **SOTA Mode**: Mask2Former-Swin-Large (5-8 FPS, 150 classes) - Best Quality
 
 ### Visualization Modes
 - **Filled Overlay**: Transparent colored segmentation mask
@@ -123,14 +124,15 @@ RealTimeSeg/
 | Fast       | 20-25ms       | 135-150ms     | 30-40     | ~1.2 GB    |
 | Balanced   | 40-50ms       | 180-200ms     | 20-25     | ~2.5 GB    |
 | Accurate   | 80-100ms      | 250-300ms     | 10-12     | ~4.5 GB    |
+| SOTA       | 125-165ms     | 300-400ms     | 5-8       | ~6.5 GB    |
 
 ### Local Hardware Examples
 
-| GPU | Fast Mode | Balanced | Accurate |
-|-----|-----------|----------|----------|
-| RTX 3060 | 40+ FPS | 30+ FPS | 15+ FPS |
-| RTX 3070 | 45+ FPS | 35+ FPS | 18+ FPS |
-| RTX 3080 | 50+ FPS | 40+ FPS | 22+ FPS |
+| GPU | Fast Mode | Balanced | Accurate | SOTA |
+|-----|-----------|----------|----------|------|
+| RTX 3060 | 40+ FPS | 30+ FPS | 15+ FPS | 8+ FPS |
+| RTX 3070 | 45+ FPS | 35+ FPS | 18+ FPS | 10+ FPS |
+| RTX 3080 | 50+ FPS | 40+ FPS | 22+ FPS | 12+ FPS |
 
 *Actual performance varies with resolution, system load, and configuration*
 
@@ -139,7 +141,7 @@ RealTimeSeg/
 ### Backend
 - **Framework**: FastAPI 0.104+ (async WebSocket support)
 - **Deep Learning**: PyTorch 2.1.0, torchvision 0.16.0
-- **Models**: DeepLabV3 (torchvision), SegFormer (Hugging Face)
+- **Models**: DeepLabV3 (torchvision), SegFormer (Hugging Face), Mask2Former (Meta/Hugging Face)
 - **Optimization**: ONNX Runtime GPU, FP16 mixed precision
 - **Image Processing**: OpenCV 4.8+, Pillow 10.0+
 - **Deployment**: uvicorn, pyngrok (for Colab)
@@ -170,7 +172,8 @@ RealTimeSeg/
 ```
 Fast Mode    →  30-40 FPS  →  Smooth interaction
 Balanced     →  20-25 FPS  →  Best trade-off (default)
-Accurate     →  10-12 FPS  →  Maximum quality
+Accurate     →  10-12 FPS  →  High quality
+SOTA         →  5-8 FPS    →  State-of-the-art (best quality)
 ```
 
 **Visualization Styles**

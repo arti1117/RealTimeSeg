@@ -80,15 +80,28 @@ class InferenceEngine:
             if self.current_mode in ["fast", "balanced"]:
                 # DeepLabV3 models
                 output = self.current_model(input_tensor)['out']
-            else:
+            elif self.current_mode == "accurate":
                 # SegFormer model
                 output = self.current_model(pixel_values=input_tensor)
                 output = output.logits
+            elif self.current_mode == "sota":
+                # Mask2Former model
+                output = self.current_model(pixel_values=input_tensor)
+                # Mask2Former outputs class_queries_logits and masks_queries_logits
+                # For semantic segmentation, we use semantic_outputs
+                output = output.semantic_segmentation
+            else:
+                raise ValueError(f"Unknown model mode: {self.current_mode}")
 
             inference_time = (time.time() - inference_start) * 1000  # Convert to ms
 
         # Get segmentation mask
-        mask = torch.argmax(output, dim=1).squeeze(0)
+        if self.current_mode == "sota":
+            # Mask2Former already outputs class predictions (H, W)
+            mask = output.squeeze(0)
+        else:
+            # Other models output logits that need argmax
+            mask = torch.argmax(output, dim=1).squeeze(0)
 
         # Postprocess mask to original size
         mask_np = self.frame_processor.postprocess_mask(mask, original_size)
@@ -174,7 +187,9 @@ class InferenceEngine:
             for i in range(num_iterations):
                 if self.current_mode in ["fast", "balanced"]:
                     _ = self.current_model(dummy_input)['out']
-                else:
+                elif self.current_mode == "accurate":
+                    _ = self.current_model(pixel_values=dummy_input)
+                elif self.current_mode == "sota":
                     _ = self.current_model(pixel_values=dummy_input)
 
         print(f"Warm-up complete")
