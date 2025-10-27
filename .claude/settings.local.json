@@ -9,7 +9,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Read(//home/arti/Documents/**)"
+      "Read(//home/arti/Documents/**)",
+      "WebFetch(domain:prepotent-unexperientially-homer.ngrok-free.dev)"
     ],
     "deny": [],
     "ask": []
