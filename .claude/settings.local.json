@@ -16,7 +16,12 @@
       "Bash(chmod:*)",
       "Bash(pkill:*)",
       "Bash(bash -c 'cd \"\"$(dirname \"\"./scripts/start_frontend.sh\"\")/../frontend\"\" && pwd && ls index.html')",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(lsof:*)",
+      "Bash(ps:*)",
+      "Bash(kill:*)",
+      "Bash(timeout:*)",
+      "Bash(./scripts/stop_frontend.sh:*)"
     ],
     "deny": [],
     "ask": []
