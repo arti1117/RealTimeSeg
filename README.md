@@ -173,9 +173,9 @@ RealTimeSeg/
 **Multiple Performance Profiles**
 ```
 Fast Mode    →  30-40 FPS  →  Smooth interaction
-Balanced     →  20-25 FPS  →  Best trade-off (default)
+Balanced     →  20-25 FPS  →  Best trade-off
 Accurate     →  10-12 FPS  →  High quality
-SOTA         →  5-8 FPS    →  State-of-the-art (best quality)
+SOTA         →  5-8 FPS    →  State-of-the-art (default, best quality)
 ```
 
 **Visualization Styles**

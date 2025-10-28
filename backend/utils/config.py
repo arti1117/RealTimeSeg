@@ -96,7 +96,7 @@ SERVER_CONFIG = {
     "log_level": "info",
     "cors_origins": ["*"],  # Allow all for demo
     "max_queue_size": 3,  # Drop frames if queue exceeds this
-    "default_model": "balanced"
+    "default_model": "sota"
 }
 
 # Frame processing configuration
