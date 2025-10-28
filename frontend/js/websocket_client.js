@@ -20,6 +20,13 @@ class WebSocketClient {
         this.serverUrl = this.getWebSocketUrl();
         this.classLabels = [];
         this.availableModels = [];
+
+        // Performance optimization
+        this.pendingFrames = 0;
+        this.maxPendingFrames = 2; // Drop frames if backend is too slow
+        this.lastFrameTime = 0;
+        this.minFrameInterval = 33; // Min 33ms between frames (~30 FPS max)
+        this.useBinaryFrames = true; // Use binary WebSocket for better performance
     }
 
     /**
@@ -118,6 +125,9 @@ class WebSocketClient {
                     break;
 
                 case 'segmentation':
+                    // Mark frame as processed
+                    this.pendingFrames = Math.max(0, this.pendingFrames - 1);
+
                     if (this.onSegmentationCallback) {
                         this.onSegmentationCallback(data);
                     }
@@ -218,13 +228,28 @@ class WebSocketClient {
     }
 
     /**
-     * Send video frame to server
+     * Send video frame to server with smart throttling
      */
     sendFrame(frameData, timestamp) {
         if (!this.isConnected || !this.ws) {
             console.warn('Not connected, cannot send frame');
             return;
         }
+
+        // Frame skipping: drop if backend is too slow
+        if (this.pendingFrames >= this.maxPendingFrames) {
+            console.debug('Dropping frame - backend busy');
+            return;
+        }
+
+        // Rate limiting: enforce minimum interval between frames
+        const now = Date.now();
+        if (now - this.lastFrameTime < this.minFrameInterval) {
+            return;
+        }
+        this.lastFrameTime = now;
+
+        this.pendingFrames++;
 
         const message = {
             type: 'frame',

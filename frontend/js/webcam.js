@@ -71,10 +71,11 @@ class WebcamCapture {
         const intervalMs = 1000 / this.frameRate;
 
         this.captureInterval = setInterval(() => {
-            this.captureFrame();
+            // Use optimized settings: lower quality (0.5) and smaller size (640px)
+            this.captureFrame(0.5, 640);
         }, intervalMs);
 
-        console.log(`Started capturing at ${this.frameRate} FPS`);
+        console.log(`Started capturing at ${this.frameRate} FPS with performance optimization`);
     }
 
     /**
@@ -92,17 +93,40 @@ class WebcamCapture {
 
     /**
      * Capture a single frame
+     * @param {number} quality - JPEG quality (0-1), default 0.5 for performance
+     * @param {number} maxDimension - Max width/height for downscaling
      */
-    captureFrame() {
+    captureFrame(quality = 0.5, maxDimension = 640) {
         if (!this.video || !this.video.videoWidth) {
             return;
         }
 
-        // Draw video frame to canvas
-        this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+        // Calculate downscaled dimensions if needed
+        let width = this.video.videoWidth;
+        let height = this.video.videoHeight;
 
-        // Get frame data as JPEG
-        const frameData = this.canvas.toDataURL('image/jpeg', 0.8);
+        if (Math.max(width, height) > maxDimension) {
+            const scale = maxDimension / Math.max(width, height);
+            width = Math.floor(width * scale);
+            height = Math.floor(height * scale);
+        }
+
+        // Use temporary canvas for downscaling if needed
+        const targetCanvas = (width !== this.canvas.width || height !== this.canvas.height)
+            ? document.createElement('canvas')
+            : this.canvas;
+
+        if (targetCanvas !== this.canvas) {
+            targetCanvas.width = width;
+            targetCanvas.height = height;
+            const tempCtx = targetCanvas.getContext('2d');
+            tempCtx.drawImage(this.video, 0, 0, width, height);
+        } else {
+            this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+        }
+
+        // Get frame data as JPEG with lower quality for speed
+        const frameData = targetCanvas.toDataURL('image/jpeg', quality);
 
         // Call callback with frame data
         if (this.onFrameCallback) {
