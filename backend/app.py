@@ -175,37 +175,53 @@ async def websocket_endpoint(websocket: WebSocket):
         print("⚠️ Server not initialized, initializing now...")
         initialize_server()
 
-    await manager.connect(websocket)
+    try:
+        await manager.connect(websocket)
 
-    # Initialize inference engine for this connection
-    state = manager.get_state(websocket)
-    inference_engine = InferenceEngine(model_loader, frame_processor)
-    inference_engine.set_model_mode(state["model_mode"])
+        # Initialize inference engine for this connection
+        state = manager.get_state(websocket)
+        inference_engine = InferenceEngine(model_loader, frame_processor)
+        inference_engine.set_model_mode(state["model_mode"])
 
-    # Warm up the model
-    inference_engine.warm_up()
+        # Warm up the model
+        inference_engine.warm_up()
 
-    # Get model config and class labels
-    config = MODEL_PROFILES[state["model_mode"]]
-    class_labels = get_class_labels_for_model(state["model_mode"])
+        # Get model config and class labels
+        config = MODEL_PROFILES[state["model_mode"]]
+        class_labels = get_class_labels_for_model(state["model_mode"])
 
-    # Initialize visualizer
-    visualizer = SegmentationVisualizer(num_classes=config.num_classes)
+        # Initialize visualizer
+        visualizer = SegmentationVisualizer(num_classes=config.num_classes)
 
-    # Update state
-    manager.update_state(websocket, {
-        "inference_engine": inference_engine,
-        "visualizer": visualizer
-    })
+        # Update state
+        manager.update_state(websocket, {
+            "inference_engine": inference_engine,
+            "visualizer": visualizer
+        })
 
-    # Send connection acknowledgement
-    await websocket.send_json({
-        "type": MessageType.CONNECTED,
-        "status": "ready",
-        "available_models": model_loader.get_available_modes(),
-        "class_labels": class_labels,
-        "current_model": state["model_mode"]
-    })
+        # Send connection acknowledgement
+        await websocket.send_json({
+            "type": MessageType.CONNECTED,
+            "status": "ready",
+            "available_models": model_loader.get_available_modes(),
+            "class_labels": class_labels,
+            "current_model": state["model_mode"]
+        })
+    except WebSocketDisconnect:
+        # Client disconnected during initialization
+        print("Client disconnected during initialization")
+        manager.disconnect(websocket)
+        return
+    except Exception as init_error:
+        # Error during initialization phase
+        print(f"Error during WebSocket initialization: {str(init_error)}")
+        manager.disconnect(websocket)
+        try:
+            if hasattr(websocket, 'client_state') and websocket.client_state.name in ['CONNECTED', 'CONNECTING']:
+                await websocket.close(code=1011, reason="Initialization failed")
+        except Exception:
+            pass
+        return
 
     try:
         while True:
@@ -229,11 +245,14 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"WebSocket error: {str(e)}")
         manager.disconnect(websocket)
-        # Only close if not already closed
+        # Only close if websocket is in a state that allows closing
         try:
-            await websocket.close()
-        except RuntimeError:
-            # Already closed, silently ignore
+            # Check if websocket is still connected before attempting to close
+            if hasattr(websocket, 'client_state') and websocket.client_state.name in ['CONNECTED', 'CONNECTING']:
+                await websocket.close()
+        except (RuntimeError, Exception) as close_error:
+            # Already closed or in invalid state, silently ignore
+            print(f"Note: Could not close websocket (already closed): {type(close_error).__name__}")
             pass
 
 
