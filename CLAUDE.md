@@ -26,6 +26,9 @@ uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 
 # Check server health
 curl http://localhost:8000/health
+
+# Run tests
+python tests/test_websocket_fixes.py
 ```
 
 ### Frontend Development
@@ -34,6 +37,10 @@ curl http://localhost:8000/health
 # Start local HTTP server for frontend (from project root)
 ./scripts/start_frontend.sh        # Linux/Mac
 scripts\start_frontend.bat         # Windows
+
+# Stop frontend server when done
+./scripts/stop_frontend.sh         # Linux/Mac
+scripts\stop_frontend.bat          # Windows
 ```
 
 ### Model Operations
@@ -280,3 +287,19 @@ scripts/                    # Utility scripts (frontend server, git helpers)
 - **Google Colab**: 90-minute idle timeout, 12-hour max session
 - **Model downloads**: ~3GB total for all three models on first run
 - **WebSocket connection**: Frontend must be able to reach backend URL (firewall/CORS considerations)
+
+## Common Issues
+
+### Frontend: "Address already in use" (Port 8080)
+
+**Error**: `OSError: [Errno 98] Address already in use`
+
+**Cause**: A previous frontend server instance is still running on port 8080
+
+**Solution**: Stop the existing server before starting a new one:
+```bash
+./scripts/stop_frontend.sh         # Linux/Mac
+scripts\stop_frontend.bat          # Windows
+```
+
+Then start the frontend server again.

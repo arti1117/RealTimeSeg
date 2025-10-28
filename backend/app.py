@@ -229,7 +229,12 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"WebSocket error: {str(e)}")
         manager.disconnect(websocket)
-        await websocket.close()
+        # Only close if not already closed
+        try:
+            await websocket.close()
+        except RuntimeError:
+            # Already closed, silently ignore
+            pass
 
 
 async def handle_frame(websocket: WebSocket, data: Dict):
@@ -282,9 +287,14 @@ async def handle_frame(websocket: WebSocket, data: Dict):
         })
 
     except Exception as e:
-        await websocket.send_json(
-            create_error_response("INFERENCE_FAILED", str(e))
-        )
+        # Only send error if websocket is still open
+        try:
+            await websocket.send_json(
+                create_error_response("INFERENCE_FAILED", str(e))
+            )
+        except (RuntimeError, WebSocketDisconnect):
+            # Connection already closed, silently ignore
+            pass
 
 
 async def handle_mode_change(websocket: WebSocket, data: Dict):
@@ -325,9 +335,12 @@ async def handle_mode_change(websocket: WebSocket, data: Dict):
         })
 
     except Exception as e:
-        await websocket.send_json(
-            create_error_response("MODE_CHANGE_FAILED", str(e))
-        )
+        try:
+            await websocket.send_json(
+                create_error_response("MODE_CHANGE_FAILED", str(e))
+            )
+        except (RuntimeError, WebSocketDisconnect):
+            pass
 
 
 async def handle_viz_update(websocket: WebSocket, data: Dict):
@@ -351,9 +364,12 @@ async def handle_viz_update(websocket: WebSocket, data: Dict):
         })
 
     except Exception as e:
-        await websocket.send_json(
-            create_error_response("VIZ_UPDATE_FAILED", str(e))
-        )
+        try:
+            await websocket.send_json(
+                create_error_response("VIZ_UPDATE_FAILED", str(e))
+            )
+        except (RuntimeError, WebSocketDisconnect):
+            pass
 
 
 async def handle_stats_request(websocket: WebSocket):
@@ -370,9 +386,12 @@ async def handle_stats_request(websocket: WebSocket):
         })
 
     except Exception as e:
-        await websocket.send_json(
-            create_error_response("STATS_FAILED", str(e))
-        )
+        try:
+            await websocket.send_json(
+                create_error_response("STATS_FAILED", str(e))
+            )
+        except (RuntimeError, WebSocketDisconnect):
+            pass
 
 
 if __name__ == "__main__":
