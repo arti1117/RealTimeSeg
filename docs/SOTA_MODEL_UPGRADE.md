@@ -86,22 +86,44 @@ elif mode == "sota":
 
 ### 3. Inference Engine (`backend/models/inference_engine.py`)
 
-**Inference Logic**:
+**Inference Logic** (Updated 2025-10-28):
 ```python
 elif self.current_mode == "sota":
-    # Mask2Former model
-    output = self.current_model(pixel_values=input_tensor)
-    output = output.semantic_segmentation
+    # Mask2Former model - query-based architecture
+    outputs = self.current_model(pixel_values=input_tensor)
+
+    # Extract query outputs
+    masks_queries_logits = outputs.masks_queries_logits  # (1, 100, H, W)
+    class_queries_logits = outputs.class_queries_logits  # (1, 100, 151)
+
+    # Resize masks to input size if needed
+    if masks_queries_logits.shape[-2:] != input_tensor.shape[-2:]:
+        masks_queries_logits = torch.nn.functional.interpolate(
+            masks_queries_logits,
+            size=input_tensor.shape[-2:],
+            mode="bilinear",
+            align_corners=False
+        )
+
+    # Apply activations
+    class_probs = torch.softmax(class_queries_logits, dim=-1)[:, :, :-1]  # Remove "no object"
+    masks_probs = torch.sigmoid(masks_queries_logits)
+
+    # Combine queries via matrix multiplication
+    # Weight each mask by its class probability
+    masks_flat = masks_probs.view(batch_size, num_queries, -1)
+    class_probs_t = class_probs.transpose(1, 2)
+    output = torch.bmm(class_probs_t, masks_flat)
+    output = output.view(batch_size, num_classes, height, width)
 ```
 
-**Mask Extraction**:
+**Note**: Mask2Former uses a query-based architecture (100 queries). Each query predicts a class and a binary mask. We combine these using matrix multiplication to generate the final semantic segmentation. See [MASK2FORMER_OUTPUT_FIX.md](MASK2FORMER_OUTPUT_FIX.md) for detailed explanation.
+
+**Mask Extraction** (Unified for all models):
 ```python
-if self.current_mode == "sota":
-    # Mask2Former already outputs class predictions (H, W)
-    mask = output.squeeze(0)
-else:
-    # Other models output logits that need argmax
-    mask = torch.argmax(output, dim=1).squeeze(0)
+# All models now output (batch, num_classes, H, W)
+# Use argmax to get final class per pixel
+mask = torch.argmax(output, dim=1).squeeze(0)  # (H, W)
 ```
 
 **Warm-up Support**:
