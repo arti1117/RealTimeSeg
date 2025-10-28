@@ -101,10 +101,10 @@ SERVER_CONFIG = {
 
 # Frame processing configuration
 FRAME_CONFIG = {
-    "jpeg_quality": 80,
+    "jpeg_quality": 60,  # Reduced from 80 for faster transmission
     "png_compression": 6,  # 0-9, higher = smaller but slower
-    "max_width": 1280,
-    "max_height": 720
+    "max_width": 960,  # Reduced from 1280 for better performance
+    "max_height": 540  # Reduced from 720 for better performance
 }
 
 # Visualization mode constants
