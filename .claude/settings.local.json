@@ -21,7 +21,8 @@
       "Bash(ps:*)",
       "Bash(kill:*)",
       "Bash(timeout:*)",
-      "Bash(./scripts/stop_frontend.sh:*)"
+      "Bash(./scripts/stop_frontend.sh:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

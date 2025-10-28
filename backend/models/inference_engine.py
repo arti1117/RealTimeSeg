@@ -86,22 +86,49 @@ class InferenceEngine:
                 output = output.logits
             elif self.current_mode == "sota":
                 # Mask2Former model
-                output = self.current_model(pixel_values=input_tensor)
+                outputs = self.current_model(pixel_values=input_tensor)
+
                 # Mask2Former outputs class_queries_logits and masks_queries_logits
-                # For semantic segmentation, we use semantic_outputs
-                output = output.semantic_segmentation
+                # We need to process these to get semantic segmentation
+                # Get the logits for each query
+                masks_queries_logits = outputs.masks_queries_logits  # (batch, num_queries, H, W)
+                class_queries_logits = outputs.class_queries_logits  # (batch, num_queries, num_classes+1)
+
+                # Resize masks to match input size if needed
+                if masks_queries_logits.shape[-2:] != input_tensor.shape[-2:]:
+                    masks_queries_logits = torch.nn.functional.interpolate(
+                        masks_queries_logits,
+                        size=input_tensor.shape[-2:],
+                        mode="bilinear",
+                        align_corners=False
+                    )
+
+                # Get class predictions (ignore the last class which is "no object")
+                class_probs = torch.softmax(class_queries_logits, dim=-1)[:, :, :-1]  # (batch, num_queries, num_classes)
+
+                # Get mask predictions
+                masks_probs = torch.sigmoid(masks_queries_logits)  # (batch, num_queries, H, W)
+
+                # Combine: for each pixel, get the class with highest score
+                # Shape: (batch, num_classes, H, W)
+                batch_size, num_queries, height, width = masks_probs.shape
+                num_classes = class_probs.shape[-1]
+
+                # Reshape for matrix multiplication
+                masks_flat = masks_probs.view(batch_size, num_queries, -1)  # (batch, num_queries, H*W)
+
+                # Weight masks by class probabilities and sum
+                # (batch, num_classes, num_queries) @ (batch, num_queries, H*W) -> (batch, num_classes, H*W)
+                class_probs_t = class_probs.transpose(1, 2)  # (batch, num_classes, num_queries)
+                output = torch.bmm(class_probs_t, masks_flat)  # (batch, num_classes, H*W)
+                output = output.view(batch_size, num_classes, height, width)  # (batch, num_classes, H, W)
             else:
                 raise ValueError(f"Unknown model mode: {self.current_mode}")
 
             inference_time = (time.time() - inference_start) * 1000  # Convert to ms
 
-        # Get segmentation mask
-        if self.current_mode == "sota":
-            # Mask2Former already outputs class predictions (H, W)
-            mask = output.squeeze(0)
-        else:
-            # Other models output logits that need argmax
-            mask = torch.argmax(output, dim=1).squeeze(0)
+        # Get segmentation mask (argmax for all models)
+        mask = torch.argmax(output, dim=1).squeeze(0)
 
         # Postprocess mask to original size
         mask_np = self.frame_processor.postprocess_mask(mask, original_size)
