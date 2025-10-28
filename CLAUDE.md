@@ -72,6 +72,32 @@ Backend and frontend run **separately** - backend provides WebSocket API, fronte
 **Backend (FastAPI)**: `backend/app.py` port 8000
 **Frontend (Vanilla JS)**: `frontend/index.html` separate server
 
+### Critical WebSocket Flow (PERFORMANCE OPTIMIZED)
+
+**The network layer was the main bottleneck** - Not the GPU inference. Original implementation sent 1280x720 frames at quality 0.8 = ~150KB/frame = 6MB/s over ngrok (unusable).
+
+**Fix applied**: Downscaling to 640x360 + quality 0.5 = ~25KB/frame = 1MB/s (smooth 20-25 FPS).
+
+```
+Frontend                          Backend
+────────                          ───────
+webcam.captureFrame(0.5, 640)    [downscale to 640px, JPEG quality 0.5]
+  ↓
+wsClient.sendFrame()              [smart throttling: max 2 pending, 33ms interval]
+  ↓
+WebSocket → /ws                   manager.connect(websocket)
+                                    ↓
+                                  inference_engine.predict(frame)
+                                    ↓
+                                  visualizer.render(mask, mode="filled")
+                                    ↓
+WebSocket ← segmentation result
+  ↓
+renderer.renderSegmentation()     [draw on canvas]
+```
+
+**See `docs/COMPLETE_PERFORMANCE_GUIDE.md` for detailed optimization breakdown (83% bandwidth reduction, 5x latency improvement).**
+
 ### Core Components
 
 #### Backend Architecture (`backend/`)
@@ -151,7 +177,17 @@ Models auto-download on first use and cache in `./models/` directory.
 
 **Frame Queue**: Server queues max 3 frames per client to prevent backlog on slow processing.
 
-**Model Warm-up**: 3 dummy inference iterations on model load/switch to optimize GPU kernel launch.
+**Model Warm-up Caching** (CRITICAL FIX): `InferenceEngine` tracks warmed-up models in `self.warmed_up_models` dict. First connection warms up (500-2000ms), subsequent connections skip warm-up (0ms). This prevents redundant initialization on every connection.
+
+```python
+# backend/models/inference_engine.py
+def warm_up(self, force: bool = False):
+    if not force and self.model_loader.is_model_warmed_up(self.current_mode):
+        print(f"Model '{self.current_mode}' already warmed up, skipping")
+        return
+    # ... perform warm-up ...
+    self.model_loader.mark_model_warmed_up(self.current_mode)
+```
 
 **FP16 Optimization**: Automatically applied on CUDA devices for ~2x speedup with minimal accuracy loss.
 
@@ -231,10 +267,21 @@ Visualization logic in `backend/utils/segmentation_viz.py`:
 
 ### Performance Optimization
 
+**Network Layer** (Primary bottleneck for ngrok/Colab):
+- Frontend: `webcam.js` line 75 → `this.captureFrame(0.5, 640)` controls quality and resolution
+- Backend: `utils/config.py` → `FRAME_CONFIG` sets JPEG quality (60) and max dimensions (960x540)
+- **For localhost**: Increase to `captureFrame(0.7, 960)` for better quality
+- **For slow networks**: Reduce to `captureFrame(0.4, 480)` if laggy
+
 **GPU Memory**: Adjust `input_size` in model profiles (smaller = less memory)
 **FPS**: Use fast mode, reduce webcam resolution, or adjust `FRAME_CONFIG.max_width/height`
 **Queue Management**: Adjust `SERVER_CONFIG.max_queue_size` (lower = more frame drops but less latency)
 **Compression**: Tune `FRAME_CONFIG.jpeg_quality` (lower = faster but lower quality)
+
+**Frame Processing** (`backend/utils/frame_processor.py`):
+- Uses `cv2.INTER_AREA` for downscaling (faster than `INTER_LINEAR`)
+- In-place normalization: `tensor.div_(255.0)` instead of `tensor / 255.0`
+- Contiguous arrays: `np.ascontiguousarray(resized)` for faster processing
 
 ### Deployment Patterns
 
@@ -249,8 +296,9 @@ Frontend needs backend WebSocket URL - configurable via custom URL input in UI.
 - **Technical Specification**: `docs/TECHNICAL_SPECIFICATION.md` - Complete system design
 - **Setup Guide**: `SETUP.md` - Installation and troubleshooting
 - **Backend API**: `backend/README.md` - WebSocket API reference
+- **WebSocket Connection Fix**: `docs/WEBSOCKET_CONNECTION_FIX.md` - Connection troubleshooting (RECENT FIX)
+- **Performance Guide**: `docs/COMPLETE_PERFORMANCE_GUIDE.md` - Optimization details (83% bandwidth reduction)
 - **Deployment Docs**: `docs/` - Colab deployment, troubleshooting, architecture guides
-- **Quick Start**: `QUICKSTART.md` - 5-minute setup guide
 
 ## Project Structure Notes
 
@@ -290,6 +338,35 @@ scripts/                    # Utility scripts (frontend server, git helpers)
 
 ## Common Issues
 
+### "Failed to connect" Error (FIXED 2025-10-28)
+
+**Problem**: Users experiencing repeated "Failed to connect" errors when connecting to backend, especially over ngrok.
+
+**Root Cause**: The `connect()` method in `frontend/js/websocket_client.js` returned immediately without waiting for WebSocket to open. Frontend waited 1 second and checked `isConnected`, but ngrok connections took 2-5 seconds.
+
+**Solution Applied** (`frontend/js/websocket_client.js` lines 71-126):
+- Made `connect()` return a Promise that resolves on `onopen` event
+- Added 10-second connection timeout
+- Smart auto-reconnect: only retry if `wasConnected` flag is true (prevents spam on initial failure)
+
+**Controls.js integration** (`frontend/js/controls.js` lines 107-144):
+```javascript
+try {
+    await this.wsClient.connect(backendUrl || null);  // Now properly waits
+    this.webcam.startCapture(...);  // Only starts if connected
+} catch (error) {
+    this.showError(`Failed to connect: ${error.message}`);
+}
+```
+
+**Troubleshooting checklist**:
+1. Check backend is running: `curl http://localhost:8000/health`
+2. Verify ngrok URL format: `https://xxx.ngrok-free.dev` (no /ws suffix, no trailing slash)
+3. Check browser console for detailed WebSocket errors
+4. Ensure ngrok tunnel is active (Colab Cell 7 for Colab deployment)
+
+**See `docs/WEBSOCKET_CONNECTION_FIX.md` for comprehensive troubleshooting guide.**
+
 ### Frontend: "Address already in use" (Port 8080)
 
 **Error**: `OSError: [Errno 98] Address already in use`
@@ -303,3 +380,32 @@ scripts\stop_frontend.bat          # Windows
 ```
 
 Then start the frontend server again.
+
+### Mask2Former Special Handling
+
+**Issue**: Mask2Former returns `Mask2FormerForUniversalSegmentationOutput` with semantic map in `.semantic_segmentation` attribute, NOT standard `logits` or `out` keys.
+
+**Solution** (`backend/models/inference_engine.py` lines 180-187):
+```python
+if self.current_mode == "sota":
+    outputs = self.current_model(pixel_values=tensor)
+    semantic_map = outputs.semantic_segmentation  # ← Special attribute
+    mask = torch.argmax(semantic_map, dim=0)
+```
+
+Other models (fast/balanced/accurate) use standard `.out` or direct logits.
+
+### ngrok Tunnel "Endpoint Already Online"
+
+**Error**: `ERR_NGROK_334: endpoint already online`
+
+**Cause**: Trying to create duplicate ngrok tunnel with same custom domain
+
+**Solution**: Notebook Cell 4.5 has manual cleanup:
+```python
+import pyngrok.ngrok as ngrok
+ngrok.kill()
+time.sleep(2)
+```
+
+Or use the safe tunnel creation in Cell 5 (auto-detects and reuses existing tunnels).

@@ -8,6 +8,7 @@ class WebSocketClient {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 2000;
+        this.wasConnected = false; // Track if we ever successfully connected
 
         // Callbacks
         this.onConnectedCallback = null;
@@ -71,7 +72,7 @@ class WebSocketClient {
     async connect(customUrl = null) {
         if (this.isConnected) {
             console.warn('Already connected');
-            return;
+            return Promise.resolve();
         }
 
         // Update server URL if custom URL provided
@@ -79,31 +80,59 @@ class WebSocketClient {
             this.serverUrl = this.getWebSocketUrl(customUrl);
         }
 
-        try {
-            console.log(`Connecting to ${this.serverUrl}...`);
+        // Return a promise that resolves when connected or rejects on error
+        return new Promise((resolve, reject) => {
+            const connectionTimeout = 10000; // 10 second timeout
+            let timeoutId;
 
-            this.ws = new WebSocket(this.serverUrl);
+            try {
+                console.log(`Connecting to ${this.serverUrl}...`);
 
-            // Set up event handlers
-            this.ws.onopen = () => this.handleOpen();
-            this.ws.onmessage = (event) => this.handleMessage(event);
-            this.ws.onerror = (error) => this.handleError(error);
-            this.ws.onclose = () => this.handleClose();
+                this.ws = new WebSocket(this.serverUrl);
 
-        } catch (error) {
-            console.error('Connection failed:', error);
-            if (this.onErrorCallback) {
-                this.onErrorCallback('CONNECTION_FAILED', error.message);
+                // Set up connection timeout
+                timeoutId = setTimeout(() => {
+                    if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+                        this.ws.close();
+                        reject(new Error('Connection timeout - server did not respond within 10 seconds'));
+                    }
+                }, connectionTimeout);
+
+                // Set up event handlers
+                this.ws.onopen = () => {
+                    clearTimeout(timeoutId);
+                    this.handleOpen();
+                    resolve(); // Resolve promise on successful connection
+                };
+
+                this.ws.onmessage = (event) => this.handleMessage(event);
+
+                this.ws.onerror = (error) => {
+                    clearTimeout(timeoutId);
+                    this.handleError(error);
+                    reject(new Error('WebSocket connection failed')); // Reject promise on error
+                };
+
+                this.ws.onclose = () => this.handleClose();
+
+            } catch (error) {
+                clearTimeout(timeoutId);
+                console.error('Connection failed:', error);
+                if (this.onErrorCallback) {
+                    this.onErrorCallback('CONNECTION_FAILED', error.message);
+                }
+                reject(error);
             }
-        }
+        });
     }
 
     /**
      * Handle WebSocket open
      */
     handleOpen() {
-        console.log('WebSocket connected');
+        console.log('✅ WebSocket connected successfully');
         this.isConnected = true;
+        this.wasConnected = true; // Mark that we successfully connected
         this.reconnectAttempts = 0;
 
         if (this.onConnectedCallback) {
@@ -181,13 +210,27 @@ class WebSocketClient {
     handleError(error) {
         console.error('❌ WebSocket error:', error);
         console.error('❌ Failed to connect to:', this.serverUrl);
-        console.error('💡 Troubleshooting:');
-        console.error('   1. Check backend is running (Colab Cell 6)');
-        console.error('   2. Verify ngrok URL is correct');
-        console.error('   3. Backend should show "Uvicorn running"');
+        console.error('');
+        console.error('💡 Troubleshooting Checklist:');
+        console.error('   1. ✓ Backend Running: Check Colab Cell 6 shows "Uvicorn running on http://0.0.0.0:8000"');
+        console.error('   2. ✓ ngrok Active: Verify ngrok URL in Cell 7 matches what you entered');
+        console.error('   3. ✓ URL Format: Should be https://xxx.ngrok-free.dev (no /ws suffix needed)');
+        console.error('   4. ✓ Network: Check your internet connection');
+        console.error('   5. ✓ Browser Console: Look for CORS or mixed content errors');
+        console.error('');
+
+        // Determine likely cause based on URL
+        let troubleshootMsg = 'Connection failed. ';
+        if (this.serverUrl.includes('ngrok')) {
+            troubleshootMsg += 'Check that ngrok tunnel is active in Colab and URL is correct.';
+        } else if (this.serverUrl.includes('localhost') || this.serverUrl.includes('127.0.0.1')) {
+            troubleshootMsg += 'Check that backend server is running locally.';
+        } else {
+            troubleshootMsg += 'Check that backend server is running and URL is correct.';
+        }
 
         if (this.onErrorCallback) {
-            this.onErrorCallback('WEBSOCKET_ERROR', 'Failed to connect to backend. Check console for details.');
+            this.onErrorCallback('WEBSOCKET_ERROR', troubleshootMsg);
         }
     }
 
@@ -202,14 +245,19 @@ class WebSocketClient {
             this.onDisconnectedCallback();
         }
 
-        // Attempt reconnection
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+        // Only attempt auto-reconnection if we were previously connected
+        // This prevents repeated failed connection attempts on initial connection failure
+        if (this.wasConnected && this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
-            console.log(`Reconnecting in ${this.reconnectDelay}ms (attempt ${this.reconnectAttempts})...`);
+            console.log(`🔄 Reconnecting in ${this.reconnectDelay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
 
             setTimeout(() => {
                 this.connect();
             }, this.reconnectDelay);
+        } else if (!this.wasConnected) {
+            console.log('Initial connection failed - not attempting auto-reconnect');
+        } else {
+            console.log('Max reconnection attempts reached');
         }
     }
 
@@ -219,6 +267,7 @@ class WebSocketClient {
     disconnect() {
         if (this.ws) {
             this.reconnectAttempts = this.maxReconnectAttempts; // Prevent auto-reconnect
+            this.wasConnected = false; // Reset connection tracking
             this.ws.close();
             this.ws = null;
         }
