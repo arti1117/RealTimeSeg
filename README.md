@@ -163,6 +163,8 @@ RealTimeSeg/
 - **[Setup Guide](SETUP.md)** - Detailed installation and troubleshooting
 - **[Backend README](backend/README.md)** - Server API reference and configuration
 - **[Colab Notebook](notebooks/colab_deployment.ipynb)** - Step-by-step deployment guide
+- **[WebSocket Connection Fix](docs/WEBSOCKET_CONNECTION_FIX.md)** - Connection troubleshooting and fixes
+- **[Performance Guide](docs/COMPLETE_PERFORMANCE_GUIDE.md)** - Optimization strategies and benchmarks
 
 ## 🎥 Demo
 
@@ -214,20 +216,23 @@ Blend Mode      →  Artistic HSV blending
 
 Common issues and solutions:
 
+**"Failed to connect" error** ⚡ FIXED
+- See [**WebSocket Connection Fix Guide**](docs/WEBSOCKET_CONNECTION_FIX.md) for comprehensive troubleshooting
+- Verify server is running: `curl http://localhost:8000/health`
+- Check firewall settings
+- For Colab: Ensure ngrok tunnel is active (Cell 7)
+- **URL format**: `https://xxx.ngrok-free.dev` (no /ws suffix or trailing slash)
+
 **Webcam not working**
 - Check browser permissions (camera access)
 - Close other apps using webcam
 - Try different browser (Chrome recommended)
 
 **Low FPS / Laggy**
+- See [**Performance Optimization Guide**](docs/COMPLETE_PERFORMANCE_GUIDE.md)
 - Switch to Fast Mode
 - Reduce webcam resolution
 - Check GPU memory: `nvidia-smi`
-
-**Connection failed**
-- Verify server is running: `curl http://localhost:8000/health`
-- Check firewall settings
-- For Colab: Ensure ngrok tunnel is active
 
 **GPU out of memory**
 - Use Fast Mode (lower memory)

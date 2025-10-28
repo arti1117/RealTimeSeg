@@ -107,25 +107,23 @@ class ControlsManager {
     async handleConnect() {
         this.showLoading('Connecting...');
 
-        // Initialize webcam
-        const webcamReady = await this.webcam.init();
-        if (!webcamReady) {
-            this.hideLoading();
-            this.showError('Failed to initialize webcam');
-            return;
-        }
+        try {
+            // Initialize webcam
+            const webcamReady = await this.webcam.init();
+            if (!webcamReady) {
+                this.hideLoading();
+                this.showError('Failed to initialize webcam');
+                return;
+            }
 
-        // Get backend URL from input field
-        const backendUrl = this.elements.backendUrl.value.trim();
+            // Get backend URL from input field
+            const backendUrl = this.elements.backendUrl.value.trim();
 
-        // Connect to WebSocket with custom URL (if provided)
-        await this.wsClient.connect(backendUrl || null);
+            // Connect to WebSocket with custom URL (if provided)
+            // This now properly waits for connection to establish
+            await this.wsClient.connect(backendUrl || null);
 
-        // Wait a bit for connection
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        if (this.wsClient.isConnected) {
-            // Start capturing frames
+            // Connection successful - start capturing frames
             this.webcam.startCapture((frameData, timestamp) => {
                 this.wsClient.sendFrame(frameData, timestamp);
             });
@@ -136,9 +134,12 @@ class ControlsManager {
 
             // Start stats polling
             this.startStatsPolling();
-        } else {
+
+        } catch (error) {
+            // Connection failed
             this.hideLoading();
-            this.showError('Failed to connect to server');
+            this.showError(`Failed to connect to server: ${error.message}`);
+            console.error('Connection error:', error);
         }
     }
 
