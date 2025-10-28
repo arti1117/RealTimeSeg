@@ -22,7 +22,9 @@
       "Bash(kill:*)",
       "Bash(timeout:*)",
       "Bash(./scripts/stop_frontend.sh:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(find:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []

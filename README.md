@@ -106,9 +106,9 @@ RealTimeSeg/
 ├── notebooks/
 │   └── colab_deployment.ipynb # Google Colab setup
 │
-├── claudedocs/
+├── docs/
 │   ├── TECHNICAL_SPECIFICATION.md # Complete system design
-│   └── API_REFERENCE.md          # WebSocket API docs
+│   └── *.md                       # Additional documentation
 │
 ├── models/                    # Model cache (auto-created)
 ├── SETUP.md                  # Detailed setup guide
@@ -159,7 +159,7 @@ RealTimeSeg/
 
 ## 📖 Documentation
 
-- **[Technical Specification](claudedocs/TECHNICAL_SPECIFICATION.md)** - Complete architecture, API design, optimization strategies
+- **[Technical Specification](docs/TECHNICAL_SPECIFICATION.md)** - Complete architecture, API design, optimization strategies
 - **[Setup Guide](SETUP.md)** - Detailed installation and troubleshooting
 - **[Backend README](backend/README.md)** - Server API reference and configuration
 - **[Colab Notebook](notebooks/colab_deployment.ipynb)** - Step-by-step deployment guide

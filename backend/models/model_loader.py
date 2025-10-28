@@ -17,6 +17,7 @@ class ModelLoader:
         self.device = DEVICE
         self.use_fp16 = USE_FP16
         self.loaded_models: Dict[str, torch.nn.Module] = {}
+        self.warmed_up_models: Dict[str, bool] = {}  # Track warm-up state
 
         # Create cache directory if it doesn't exist
         os.makedirs(cache_dir, exist_ok=True)
@@ -158,5 +159,14 @@ class ModelLoader:
     def clear_cache(self):
         """Clear loaded models from memory."""
         self.loaded_models.clear()
+        self.warmed_up_models.clear()
         torch.cuda.empty_cache() if torch.cuda.is_available() else None
         print("Model cache cleared")
+
+    def is_model_warmed_up(self, mode: str) -> bool:
+        """Check if a model has been warmed up."""
+        return self.warmed_up_models.get(mode, False)
+
+    def mark_model_warmed_up(self, mode: str):
+        """Mark a model as warmed up."""
+        self.warmed_up_models[mode] = True
