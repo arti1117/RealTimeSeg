@@ -75,3 +75,13 @@ ngrok
 # Colab specific
 drive/
 sample_data/
+
+# Claude Code
+.claude/settings.local.json
+
+# Frontend test files
+frontend/test_connection.html
+
+# Empty placeholder directories
+frontend/assets/icons/
+models/

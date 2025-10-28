@@ -246,7 +246,7 @@ Frontend needs backend WebSocket URL - configurable via custom URL input in UI.
 
 ## Documentation References
 
-- **Technical Specification**: `claudedocs/TECHNICAL_SPECIFICATION.md` - Complete system design
+- **Technical Specification**: `docs/TECHNICAL_SPECIFICATION.md` - Complete system design
 - **Setup Guide**: `SETUP.md` - Installation and troubleshooting
 - **Backend API**: `backend/README.md` - WebSocket API reference
 - **Deployment Docs**: `docs/` - Colab deployment, troubleshooting, architecture guides

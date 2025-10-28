@@ -193,13 +193,19 @@ class InferenceEngine:
             "avg_fps": round(1000 / avg_inference, 1) if avg_inference > 0 else 0
         }
 
-    def warm_up(self, num_iterations: int = 3):
+    def warm_up(self, num_iterations: int = 3, force: bool = False):
         """
         Warm up the model with dummy inputs to optimize performance.
 
         Args:
             num_iterations: Number of warm-up iterations
+            force: Force warm-up even if model is already warmed up
         """
+        # Skip if model already warmed up (unless forced)
+        if not force and self.model_loader.is_model_warmed_up(self.current_mode):
+            print(f"Model '{self.current_mode}' already warmed up, skipping")
+            return
+
         print(f"Warming up {self.current_mode} model...")
 
         config = MODEL_PROFILES[self.current_mode]
@@ -219,6 +225,8 @@ class InferenceEngine:
                 elif self.current_mode == "sota":
                     _ = self.current_model(pixel_values=dummy_input)
 
+        # Mark model as warmed up
+        self.model_loader.mark_model_warmed_up(self.current_mode)
         print(f"Warm-up complete")
 
     def reset_performance_stats(self):
