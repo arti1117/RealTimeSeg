@@ -40,9 +40,21 @@ class WebcamCapture {
                 this.video.onloadedmetadata = () => {
                     console.log(`Webcam initialized: ${this.video.videoWidth}x${this.video.videoHeight}`);
 
-                    // Set canvas size to match video
-                    this.canvas.width = this.video.videoWidth;
-                    this.canvas.height = this.video.videoHeight;
+                    // Set canvas size to match capture resolution (640px max dimension)
+                    const maxDimension = 640;
+                    const videoWidth = this.video.videoWidth;
+                    const videoHeight = this.video.videoHeight;
+
+                    if (Math.max(videoWidth, videoHeight) > maxDimension) {
+                        const scale = maxDimension / Math.max(videoWidth, videoHeight);
+                        this.canvas.width = Math.floor(videoWidth * scale);
+                        this.canvas.height = Math.floor(videoHeight * scale);
+                    } else {
+                        this.canvas.width = videoWidth;
+                        this.canvas.height = videoHeight;
+                    }
+
+                    console.log(`Canvas set to: ${this.canvas.width}x${this.canvas.height}`);
 
                     resolve();
                 };

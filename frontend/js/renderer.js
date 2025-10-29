@@ -15,14 +15,29 @@ class CanvasRenderer {
         const img = new Image();
 
         img.onload = () => {
-            // Set canvas size if needed
-            if (this.canvas.width !== img.width || this.canvas.height !== img.height) {
-                this.canvas.width = img.width;
-                this.canvas.height = img.height;
+            // Clear canvas first
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // Scale image to fit canvas while maintaining aspect ratio
+            const canvasAspect = this.canvas.width / this.canvas.height;
+            const imgAspect = img.width / img.height;
+
+            let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
+
+            if (imgAspect > canvasAspect) {
+                // Image is wider - fit to width
+                drawWidth = this.canvas.width;
+                drawHeight = this.canvas.width / imgAspect;
+                offsetY = (this.canvas.height - drawHeight) / 2;
+            } else {
+                // Image is taller - fit to height
+                drawHeight = this.canvas.height;
+                drawWidth = this.canvas.height * imgAspect;
+                offsetX = (this.canvas.width - drawWidth) / 2;
             }
 
-            // Draw the segmented image
-            this.ctx.drawImage(img, 0, 0);
+            // Draw the segmented image scaled to fit
+            this.ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
 
             this.currentImage = img;
         };

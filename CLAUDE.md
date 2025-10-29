@@ -268,7 +268,8 @@ Visualization logic in `backend/utils/segmentation_viz.py`:
 ### Performance Optimization
 
 **Network Layer** (Primary bottleneck for ngrok/Colab):
-- Frontend: `webcam.js` line 75 → `this.captureFrame(0.5, 640)` controls quality and resolution
+- Frontend: `webcam.js` line ~75 → `this.captureFrame(0.5, 640)` controls quality and resolution
+- Frontend: `webcam.js` line ~44-55 → Canvas resolution set to match 640px max dimension (consistent display)
 - Backend: `utils/config.py` → `FRAME_CONFIG` sets JPEG quality (60) and max dimensions (960x540)
 - **For localhost**: Increase to `captureFrame(0.7, 960)` for better quality
 - **For slow networks**: Reduce to `captureFrame(0.4, 480)` if laggy
@@ -282,6 +283,11 @@ Visualization logic in `backend/utils/segmentation_viz.py`:
 - Uses `cv2.INTER_AREA` for downscaling (faster than `INTER_LINEAR`)
 - In-place normalization: `tensor.div_(255.0)` instead of `tensor / 255.0`
 - Contiguous arrays: `np.ascontiguousarray(resized)` for faster processing
+
+**Rendering** (`frontend/js/renderer.js`):
+- Scales images to fit canvas while maintaining aspect ratio
+- Centers images with letterboxing if needed (prevents distortion)
+- Clears canvas before each draw to avoid artifacts
 
 ### Deployment Patterns
 
@@ -383,17 +389,22 @@ Then start the frontend server again.
 
 ### Mask2Former Special Handling
 
-**Issue**: Mask2Former returns `Mask2FormerForUniversalSegmentationOutput` with semantic map in `.semantic_segmentation` attribute, NOT standard `logits` or `out` keys.
+**Issue**: Mask2Former returns `Mask2FormerForUniversalSegmentationOutput` that requires combining class queries with mask queries, NOT standard `logits` or `out` keys.
 
-**Solution** (`backend/models/inference_engine.py` lines 180-187):
+**Solution** (`backend/models/inference_engine.py` lines 88-124):
 ```python
 if self.current_mode == "sota":
-    outputs = self.current_model(pixel_values=tensor)
-    semantic_map = outputs.semantic_segmentation  # ← Special attribute
-    mask = torch.argmax(semantic_map, dim=0)
+    outputs = self.current_model(pixel_values=input_tensor)
+    masks_queries_logits = outputs.masks_queries_logits  # (batch, num_queries, H, W)
+    class_queries_logits = outputs.class_queries_logits  # (batch, num_queries, num_classes+1)
+
+    # Combine class predictions with mask predictions
+    class_probs = torch.softmax(class_queries_logits, dim=-1)[:, :, :-1]
+    masks_probs = torch.sigmoid(masks_queries_logits)
+    output = torch.bmm(class_probs.transpose(1, 2), masks_flat)  # Weighted combination
 ```
 
-Other models (fast/balanced/accurate) use standard `.out` or direct logits.
+Other models (fast/balanced/accurate) use standard `.out` or direct logits from `.logits`.
 
 ### ngrok Tunnel "Endpoint Already Online"
 
